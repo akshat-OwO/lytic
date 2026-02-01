@@ -1,7 +1,6 @@
 import js from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
-import onlyWarn from "eslint-plugin-only-warn";
 import turboPlugin from "eslint-plugin-turbo";
 import tseslint from "typescript-eslint";
 
@@ -33,11 +32,6 @@ export const config = [
 					ignoreRestSiblings: true,
 				},
 			],
-		},
-	},
-	{
-		plugins: {
-			onlyWarn,
 		},
 	},
 	{

@@ -1,0 +1,12 @@
+{
+	"extends": "@workspace/typescript-config/base.json",
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "NodeNext",
+		"types": ["node"],
+		"jsx": "react-jsx",
+		"jsxImportSource": "hono/jsx",
+		"outDir": "./dist"
+	},
+	"exclude": ["node_modules", "dist"]
+}
