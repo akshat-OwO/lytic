@@ -8,11 +8,12 @@
 		"start": "node dist/index.js"
 	},
 	"dependencies": {
-		"@aws-sdk/client-s3": "^3.980.0",
 		"@hono/node-server": "^1.19.9",
 		"@hono/zod-validator": "^0.7.6",
+		"@workspace/backend": "workspace:*",
 		"@t3-oss/env-core": "^0.13.10",
 		"chalk": "^5.6.2",
+		"convex": "^1.31.7",
 		"dotenv": "^17.2.3",
 		"effect": "^3.19.15",
 		"hono": "^4.11.7",

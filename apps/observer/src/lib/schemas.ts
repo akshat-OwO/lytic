@@ -74,7 +74,6 @@ export const JobMetadata = z.object({
 	status: JobStatus,
 	createdAt: z.string(),
 	completedAt: z.string().optional(),
-	webhookUrl: z.string(),
 	error: z
 		.object({
 			code: z.string(),
@@ -97,43 +96,10 @@ export const AggregatedReport = z.object({
 });
 export type AggregatedReport = z.infer<typeof AggregatedReport>;
 
-// Webhook payload
-export const WebhookPayload = z.object({
-	jobId: JobId,
-	status: JobStatus,
-	url: z.string(),
-	deviceType: DeviceType,
-	reportKey: z.string().optional(),
-	summary: z
-		.object({
-			scores: Scores,
-			metrics: Metrics,
-		})
-		.optional(),
-	error: z
-		.object({
-			code: z.string(),
-			message: z.string(),
-		})
-		.optional(),
-});
-export type WebhookPayload = z.infer<typeof WebhookPayload>;
-
 // Request validation schema (Hono)
 export const observeSchema = z.object({
 	url: z.string().url(),
 	deviceType: z.enum(["mobile", "desktop"]),
-	webhookUrl: z
-		.string()
-		.url()
-		.refine((value) => {
-			try {
-				return new URL(value).protocol === "https:";
-			} catch {
-				return false;
-			}
-		}, "webhookUrl must be https"),
-	webhookSecret: z.string().optional(),
 });
 
 export type TObserveSchema = z.infer<typeof observeSchema>;
