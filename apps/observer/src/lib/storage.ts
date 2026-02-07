@@ -1,35 +1,12 @@
-import {
-	DeleteObjectCommand,
-	GetObjectCommand,
-	ListObjectsV2Command,
-	PutObjectCommand,
-	S3Client,
-} from "@aws-sdk/client-s3";
+import { api } from "@workspace/backend";
+import { ConvexHttpClient } from "convex/browser";
 import { Data, Effect } from "effect";
 
 import { env } from "./env.js";
 
 // Tagged errors
-export class R2UploadError extends Data.TaggedError("R2UploadError")<{
-	key: string;
-	message: string;
-	cause?: string;
-}> {}
-
-export class R2DownloadError extends Data.TaggedError("R2DownloadError")<{
-	key: string;
-	message: string;
-	cause?: string;
-}> {}
-
-export class R2DeleteError extends Data.TaggedError("R2DeleteError")<{
-	key: string;
-	message: string;
-	cause?: string;
-}> {}
-
-export class R2ListError extends Data.TaggedError("R2ListError")<{
-	prefix: string;
+export class ConvexRequestError extends Data.TaggedError("ConvexRequestError")<{
+	operation: string;
 	message: string;
 	cause?: string;
 }> {}
@@ -37,168 +14,141 @@ export class R2ListError extends Data.TaggedError("R2ListError")<{
 export class Storage extends Effect.Service<Storage>()("observer/Storage", {
 	accessors: true,
 	sync: () => {
-		const client = new S3Client({
-			region: "auto",
-			endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-			credentials: {
-				accessKeyId: env.R2_ACCESS_KEY_ID,
-				secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-			},
-		});
-
-		const bucketName = env.R2_BUCKET_NAME;
-
-		const upload = Effect.fn("Storage.upload")(function* (
-			key: string,
-			body: string | Buffer,
-			contentType: string,
-		) {
-			yield* Effect.log("Uploading to R2", { key, contentType });
-
-			const command = new PutObjectCommand({
-				Bucket: bucketName,
-				Key: key,
-				Body: body,
-				ContentType: contentType,
-			});
-
-			yield* Effect.tryPromise({
-				try: () => client.send(command),
-				catch: (error) =>
-					new R2UploadError({
-						key,
-						message: "Failed to upload to R2",
-						cause:
-							error instanceof Error
-								? error.message
-								: String(error),
-					}),
-			});
-
-			yield* Effect.log("Upload successful", { key });
-			return key;
-		});
-
-		const download = Effect.fn("Storage.download")(function* (key: string) {
-			yield* Effect.log("Downloading from R2", { key });
-
-			const command = new GetObjectCommand({
-				Bucket: bucketName,
-				Key: key,
-			});
-
-			const response = yield* Effect.tryPromise({
-				try: () => client.send(command),
-				catch: (error) =>
-					new R2DownloadError({
-						key,
-						message: "Failed to download from R2",
-						cause:
-							error instanceof Error
-								? error.message
-								: String(error),
-					}),
-			});
-
-			if (!response.Body) {
-				return yield* new R2DownloadError({
-					key,
-					message: "Empty response body from R2",
-				});
-			}
-
-			const body = yield* Effect.tryPromise({
-				try: () => response.Body!.transformToString(),
-				catch: (error) =>
-					new R2DownloadError({
-						key,
-						message: "Failed to read response body",
-						cause:
-							error instanceof Error
-								? error.message
-								: String(error),
-					}),
-			});
-
-			yield* Effect.log("Download successful", {
-				key,
-				size: body.length,
-			});
-			return body;
-		});
-
-		const deleteObject = Effect.fn("Storage.delete")(function* (
-			key: string,
-		) {
-			yield* Effect.log("Deleting from R2", { key });
-
-			const command = new DeleteObjectCommand({
-				Bucket: bucketName,
-				Key: key,
-			});
-
-			yield* Effect.tryPromise({
-				try: () => client.send(command),
-				catch: (error) =>
-					new R2DeleteError({
-						key,
-						message: "Failed to delete from R2",
-						cause:
-							error instanceof Error
-								? error.message
-								: String(error),
-					}),
-			});
-
-			yield* Effect.log("Delete successful", { key });
-			return key;
-		});
-
-		const listByPrefix = Effect.fn("Storage.listByPrefix")(function* (
-			prefix: string,
-		) {
-			yield* Effect.log("Listing objects from R2", { prefix });
-
-			const command = new ListObjectsV2Command({
-				Bucket: bucketName,
-				Prefix: prefix,
-			});
-
-			const response = yield* Effect.tryPromise({
-				try: () => client.send(command),
-				catch: (error) =>
-					new R2ListError({
-						prefix,
-						message: "Failed to list objects from R2",
-						cause:
-							error instanceof Error
-								? error.message
-								: String(error),
-					}),
-			});
-
-			const keys = response.Contents?.map((obj) => obj.Key || "") || [];
-			yield* Effect.log("List successful", {
-				prefix,
-				count: keys.length,
-			});
-			return keys;
-		});
-
-		const uploadJson = Effect.fn("Storage.uploadJson")(function* (
-			key: string,
-			data: unknown,
-		) {
-			const body = JSON.stringify(data, null, 2);
-			return yield* upload(key, body, "application/json");
-		});
-
-		return {
-			upload,
-			download,
-			delete: deleteObject,
-			listByPrefix,
-			uploadJson,
+		const client = new ConvexHttpClient(env.CONVEX_URL);
+		const getErrorDetails = (error: unknown): string => {
+			if (!(error instanceof Error)) return String(error);
+			// Node's fetch wraps the real error in .cause
+			const rootCause =
+				error.cause instanceof Error
+					? error.cause.message
+					: error.cause
+						? String(error.cause)
+						: undefined;
+			return rootCause
+				? `${error.message} -> ${rootCause}`
+				: error.message;
 		};
+
+		const logConvexError = (operation: string, error: unknown) =>
+			Effect.logError("Convex request failed", {
+				operation,
+				url: env.CONVEX_URL,
+				cause: getErrorDetails(error),
+			});
+
+		const createJob = Effect.fn("Storage.createJob")(function* (params: {
+			jobId: string;
+			url: string;
+			deviceType: string;
+			createdAt: string;
+		}) {
+			return yield* Effect.tryPromise({
+				try: () =>
+					client.mutation(api.performance.createJob, {
+						jobId: params.jobId,
+						url: params.url,
+						deviceType: params.deviceType,
+						createdAt: params.createdAt,
+					}),
+				catch: (error) => {
+					Effect.runSync(logConvexError("createJob", error));
+					return new ConvexRequestError({
+						operation: "createJob",
+						message: "Failed to create job",
+						cause: getErrorDetails(error),
+					});
+				},
+			});
+		});
+
+		const updateJobStatus = Effect.fn("Storage.updateJobStatus")(
+			function* (params: {
+				jobId: string;
+				status: string;
+				completedAt?: string;
+				reportId?: string;
+				error?: { code: string; message: string };
+			}) {
+				return yield* Effect.tryPromise({
+					try: () =>
+						client.mutation(api.performance.updateJobStatus, {
+							jobId: params.jobId,
+							status: params.status,
+							completedAt: params.completedAt,
+							reportId: params.reportId,
+							error: params.error,
+						}),
+					catch: (error) => {
+						Effect.runSync(
+							logConvexError("updateJobStatus", error),
+						);
+						return new ConvexRequestError({
+							operation: "updateJobStatus",
+							message: "Failed to update job status",
+							cause: getErrorDetails(error),
+						});
+					},
+				});
+			},
+		);
+
+		const saveReport = Effect.fn("Storage.saveReport")(function* (params: {
+			jobId: string;
+			url: string;
+			deviceType: string;
+			createdAt: string;
+			completedAt: string;
+			scores: {
+				performance: number;
+				accessibility: number;
+				bestPractices: number;
+				seo: number;
+			};
+			metrics: {
+				lcp: { value: number; unit: string; rating: string };
+				fcp: { value: number; unit: string; rating: string };
+				cls: { value: number; unit: string; rating: string };
+				tbt: { value: number; unit: string; rating: string };
+				tti: { value: number; unit: string; rating: string };
+				si: { value: number; unit: string; rating: string };
+			};
+			runs: Array<{
+				runNumber: number;
+				timestamp: string;
+				scores: {
+					performance: number;
+					accessibility: number;
+					bestPractices: number;
+					seo: number;
+				};
+				metrics: {
+					lcp: { value: number; unit: string; rating: string };
+					fcp: { value: number; unit: string; rating: string };
+					cls: { value: number; unit: string; rating: string };
+					tbt: { value: number; unit: string; rating: string };
+					tti: { value: number; unit: string; rating: string };
+					si: { value: number; unit: string; rating: string };
+				};
+				filmstrip: Array<{
+					timestamp: number;
+					timing: number;
+					data: string;
+				}>;
+			}>;
+		}) {
+			return yield* Effect.tryPromise({
+				try: () => client.mutation(api.performance.saveReport, params),
+				catch: (error) => {
+					Effect.runSync(logConvexError("saveReport", error));
+					return new ConvexRequestError({
+						operation: "saveReport",
+						message: "Failed to save report",
+						cause: getErrorDetails(error),
+					});
+				},
+			});
+		});
+
+		return { createJob, updateJobStatus, saveReport };
 	},
 }) {}

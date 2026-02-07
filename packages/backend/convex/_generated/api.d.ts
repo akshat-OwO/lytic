@@ -8,7 +8,7 @@
  * @module
  */
 
-import type * as test from "../test.js";
+import type * as performance from "../performance.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +17,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  test: typeof test;
+  performance: typeof performance;
 }>;
 
 /**

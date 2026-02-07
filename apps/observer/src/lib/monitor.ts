@@ -353,8 +353,7 @@ export class Monitor extends Effect.Service<Monitor>()("observer/Monitor", {
 				runs: runsData,
 			};
 
-			const reportKey = `jobs/${jobId}/report.json`;
-			yield* storage.uploadJson(reportKey, aggregatedReport);
+			const reportId = yield* storage.saveReport(aggregatedReport);
 
 			yield* Effect.log("Audit completed successfully", {
 				jobId,
@@ -364,7 +363,7 @@ export class Monitor extends Effect.Service<Monitor>()("observer/Monitor", {
 			});
 
 			return {
-				reportKey,
+				reportId,
 				aggregatedReport,
 			};
 		});
