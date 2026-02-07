@@ -51,7 +51,7 @@ export class Storage extends Effect.Service<Storage>()("observer/Storage", {
 						createdAt: params.createdAt,
 					}),
 				catch: (error) => {
-					Effect.runSync(logConvexError("createJob", error));
+					Effect.runFork(logConvexError("createJob", error));
 					return new ConvexRequestError({
 						operation: "createJob",
 						message: "Failed to create job",
@@ -79,7 +79,7 @@ export class Storage extends Effect.Service<Storage>()("observer/Storage", {
 							error: params.error,
 						}),
 					catch: (error) => {
-						Effect.runSync(
+						Effect.runFork(
 							logConvexError("updateJobStatus", error),
 						);
 						return new ConvexRequestError({
@@ -139,7 +139,7 @@ export class Storage extends Effect.Service<Storage>()("observer/Storage", {
 			return yield* Effect.tryPromise({
 				try: () => client.mutation(api.performance.saveReport, params),
 				catch: (error) => {
-					Effect.runSync(logConvexError("saveReport", error));
+					Effect.runFork(logConvexError("saveReport", error));
 					return new ConvexRequestError({
 						operation: "saveReport",
 						message: "Failed to save report",
