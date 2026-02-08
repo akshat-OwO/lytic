@@ -29,6 +29,23 @@ const handleError = (params: {
 	return Effect.gen(function* () {
 		const storage = yield* Storage;
 
+		const toErrorDetails = (err: unknown) => {
+			if (err instanceof Error) {
+				const cause =
+					err.cause instanceof Error
+						? err.cause.message
+						: err.cause
+							? String(err.cause)
+							: undefined;
+				return {
+					message: err.message,
+					stack: err.stack,
+					cause,
+				};
+			}
+			return { message: String(err) };
+		};
+
 		const { jobId, url, deviceType, createdAt } = params;
 		const error = params.error as
 			| BrowserLaunchError
@@ -50,6 +67,17 @@ const handleError = (params: {
 			errorCode = "STORAGE_ERROR";
 			errorMessage = (error as ConvexRequestError).message;
 		}
+
+		yield* Effect.logError("Observer job failed", {
+			jobId,
+			url,
+			deviceType,
+			createdAt,
+			errorTag: (error as { _tag?: string })._tag,
+			errorCode,
+			errorMessage,
+			...toErrorDetails(params.error),
+		});
 
 		// Update job metadata to failed state
 		const failedMetadata: JobMetadata = {
