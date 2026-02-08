@@ -1,5 +1,6 @@
-import { api } from "@workspace/backend";
+import type { PublicApiType } from "@workspace/backend";
 import { ConvexHttpClient } from "convex/browser";
+import { anyApi } from "convex/server";
 import { Data, Effect } from "effect";
 
 import { env } from "./env.js";
@@ -10,6 +11,8 @@ export class ConvexRequestError extends Data.TaggedError("ConvexRequestError")<{
 	message: string;
 	cause?: string;
 }> {}
+
+const api = anyApi as unknown as PublicApiType;
 
 export class Storage extends Effect.Service<Storage>()("observer/Storage", {
 	accessors: true,
