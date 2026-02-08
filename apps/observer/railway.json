@@ -3,7 +3,7 @@
 	"build": {
 		"builder": "RAILPACK",
 		"watchPatterns": ["/apps/observer/**"],
-		"buildCommand": "cd packages/backend && pnpx convex deploy --cmd 'cd ../../ && pnpm --filter observer build'",
+		"buildCommand": "pnpm --filter observer build && cd packages/backend && pnpx convex deploy",
 		"nixpacksPlan": {
 			"phases": {
 				"setup": {
