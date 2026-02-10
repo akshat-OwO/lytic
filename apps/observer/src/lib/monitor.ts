@@ -258,8 +258,6 @@ export class Monitor extends Effect.Service<Monitor>()("observer/Monitor", {
 						puppeteer.launch({
 							headless: true,
 							args: ["--no-sandbox", "--disable-setuid-sandbox"],
-							executablePath:
-								process.env.PUPPETEER_EXECUTABLE_PATH,
 						}),
 					catch: (error) =>
 						new BrowserLaunchError({
